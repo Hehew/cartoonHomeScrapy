@@ -25,26 +25,32 @@ class CartoonhomeSpider(scrapy.Spider):
         # )
         # yield Request(url='http://www.dm5.com/m696448',callback=self.list_all_detail)
 
-    #列出所有本集漫画中的request url
-    def list_all_detail(self, response):
-        begin_url = response.url[:-1]
-        end_page = int(response.css('#chapterpager > a:last-child::text').extract_first())
-        # item = CartoonDetail()
-        # item['title'] = response.css('div.title > span:nth-child(2) > a::text').extract_first()
-        # item['num_section'] = re.match('.*?(\d+).*?',response.css('div.title > span.active.right-arrow::text').extract_first()).group(1)
-        # item['content_image_url'] = response.css('#cp_image::attr(src)').extract_first()
-        # item['page_num'] = response.css('#chapterpager > span.current::text').extract_first()
-        self.parse_detail(response)
-        for page in range(2,end_page + 1):
-            yield Request(url=begin_url + '-p' + str(page) + '/',callback=self.parse_detail)
-
-    def parse_detail(self, response):
+    def parse_cartoon_detail(self, response):
         item = CartoonDetail()
         item['title'] = response.css('div.title > span:nth-child(2) > a::text').extract_first()
         item['num_section'] = re.match('.*?(\d+).*?',response.css('div.title > span.active.right-arrow::text').extract_first()).group(1)
         item['content_image_url'] = response.css('#cp_image::attr(src)').extract_first()
         item['page_num'] = response.css('#chapterpager > span.current::text').extract_first()
         yield item
+
+    #列出所有本集漫画中的request url
+    def list_all_detail(self, response):
+        begin_url = response.url[:-1]
+        end_page = response.css('#chapterpager > a:last-child::text').extract_first()
+        if end_page:
+            end_page_num = int(end_page)
+        # item = CartoonDetail()
+        # item['title'] = response.css('div.title > span:nth-child(2) > a::text').extract_first()
+        # item['num_section'] = re.match('.*?(\d+).*?',response.css('div.title > span.active.right-arrow::text').extract_first()).group(1)
+        # item['content_image_url'] = response.css('#cp_image::attr(src)').extract_first()
+        # item['page_num'] = response.css('#chapterpager > span.current::text').extract_first()
+        for page in range(1, end_page_num + 1):
+            if page == 1:
+                print(begin_url)
+                yield Request(url=begin_url, callback=self.parse_cartoon_detail)
+            else:
+                print(begin_url + '-p' + str(page) + '/')
+                yield Request(url=begin_url + '-p' + str(page) + '/',callback=self.parse_cartoon_detail)
 
     # 解析漫画目录
     def parse_menu(self, response):
@@ -54,8 +60,10 @@ class CartoonhomeSpider(scrapy.Spider):
             item = CartoonMenu()
             item['title'] = title.strip()
             item['name_section'] = menu.css('a::text').extract_first().strip()
-            item['num_section'] = re.match('.*?(\d+).*?',item['name_section']).group(1)
-            item['pic_num'] = menu.css('a > span::text').extract_first().strip()[1:-1]
+            if item['name_section']:
+                item['num_section'] = re.match('.*?(\d+).*?',item['name_section']).group(1)
+            if menu.css('a > span::text').extract_first():
+                item['pic_num'] = menu.css('a > span::text').extract_first().strip()[1:-1]
             item['detail_url'] = self.base_url + menu.css('a::attr(href)').extract_first()
             yield item
             yield Request(url=item['detail_url'],callback=self.list_all_detail)
@@ -76,5 +84,5 @@ class CartoonhomeSpider(scrapy.Spider):
                 #爬取漫画具体目录
                 yield Request(url=item['menu_url'],callback=self.parse_menu)
                 #爬取下一页
-                yield Request(url=self.start_urls[0] + '-p' + str(self.page) + '/',callback=self.parse_all_cartoon )
+                yield Request(url=self.start_urls[0] + '-p' + str(self.page) + '/',callback=self.parse_all_cartoon)
 
